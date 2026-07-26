@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import com.deivid22srk.sitehub.data.model.SiteEntity
 import com.deivid22srk.sitehub.data.model.UserscriptEntity
 
-@Database(entities = [SiteEntity::class, UserscriptEntity::class], version = 2, exportSchema = false)
+@Database(entities = [SiteEntity::class, UserscriptEntity::class], version = 3, exportSchema = false)
 abstract class SiteDatabase : RoomDatabase() {
     abstract fun siteDao(): SiteDao
     abstract fun userscriptDao(): UserscriptDao

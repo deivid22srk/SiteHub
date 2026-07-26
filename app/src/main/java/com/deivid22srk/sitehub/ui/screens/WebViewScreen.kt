@@ -150,6 +150,67 @@ fun WebViewScreen(
         }
     }
 
+    fun injectSharedSession(webView: WebView) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val site = app.repository.getById(siteId) ?: return@launch
+                if (site.sharedGroupId <= 0) return@launch
+
+                val syncJs = """
+                    (function() {
+                        var GROUP_KEY = '__sitehub_shared_${site.sharedGroupId}';
+                        try {
+                            var stored = localStorage.getItem(GROUP_KEY);
+                            if (stored) {
+                                var data = JSON.parse(stored);
+                                Object.keys(data).forEach(function(k) {
+                                    if (localStorage.getItem(k) === null) {
+                                        localStorage.setItem(k, data[k]);
+                                    }
+                                });
+                            }
+                            var snapshot = {};
+                            for (var i = 0; i < localStorage.length; i++) {
+                                var key = localStorage.key(i);
+                                if (key !== GROUP_KEY && key.indexOf('__sitehub') !== 0) {
+                                    snapshot[key] = localStorage.getItem(key);
+                                }
+                            }
+                            localStorage.setItem(GROUP_KEY, JSON.stringify(snapshot));
+
+                            var origSetItem = Storage.prototype.setItem;
+                            Storage.prototype.setItem = function(k, v) {
+                                origSetItem.call(this, k, v);
+                                if (this === localStorage && k !== GROUP_KEY && k.indexOf('__sitehub') !== 0) {
+                                    try {
+                                        var s = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
+                                        s[k] = v;
+                                        localStorage.setItem(GROUP_KEY, JSON.stringify(s));
+                                    } catch(e) {}
+                                }
+                            };
+                            var origRemoveItem = Storage.prototype.removeItem;
+                            Storage.prototype.removeItem = function(k) {
+                                origRemoveItem.call(this, k);
+                                if (this === localStorage && k !== GROUP_KEY) {
+                                    try {
+                                        var s = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}');
+                                        delete s[k];
+                                        localStorage.setItem(GROUP_KEY, JSON.stringify(s));
+                                    } catch(e) {}
+                                }
+                            };
+                        } catch(e) {}
+                    })();
+                """.trimIndent()
+
+                CoroutineScope(Dispatchers.Main).launch {
+                    webView.evaluateJavascript(syncJs, null)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     fun createWebView(ctx: Context): WebView {
         return WebView(ctx).apply {
             webViewRef = this
@@ -188,7 +249,10 @@ fun WebViewScreen(
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     canGoBack = view?.canGoBack() ?: false
-                    view?.let { injectUserscripts(it) }
+                    view?.let {
+                        injectSharedSession(it)
+                        injectUserscripts(it)
+                    }
                 }
             }
 

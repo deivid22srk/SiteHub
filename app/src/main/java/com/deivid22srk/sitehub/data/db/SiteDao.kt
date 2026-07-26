@@ -28,4 +28,13 @@ interface SiteDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM sites WHERE url = :url)")
     suspend fun exists(url: String): Boolean
+
+    @Query("SELECT * FROM sites WHERE id = :id")
+    suspend fun getById(id: Long): SiteEntity?
+
+    @Query("UPDATE sites SET sharedGroupId = :groupId WHERE id = :siteId")
+    suspend fun updateSharedGroup(siteId: Long, groupId: Long)
+
+    @Query("SELECT * FROM sites WHERE sharedGroupId = :groupId AND id != :excludeId")
+    suspend fun getGroupPeers(groupId: Long, excludeId: Long): List<SiteEntity>
 }

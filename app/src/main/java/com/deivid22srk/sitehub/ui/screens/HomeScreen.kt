@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -92,6 +94,7 @@ fun HomeScreen(
     var showEditTitleDialog by remember { mutableStateOf<SiteEntity?>(null) }
     var showIconDialog by remember { mutableStateOf<SiteEntity?>(null) }
     var showDeleteDialog by remember { mutableStateOf<SiteEntity?>(null) }
+    var showShareDialog by remember { mutableStateOf<SiteEntity?>(null) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val sheetState = rememberModalBottomSheetState()
@@ -228,6 +231,15 @@ fun HomeScreen(
                     onClick = {
                         selectedSite = null
                         onNavigateToUserscripts(site.id, site.title)
+                    }
+                )
+
+                SheetItem(
+                    icon = { Icon(Icons.Default.Link, contentDescription = null) },
+                    text = if (site.sharedGroupId > 0) "Compartilhando sessão" else "Compartilhar sessão",
+                    onClick = {
+                        selectedSite = null
+                        showShareDialog = site
                     }
                 )
 
@@ -397,6 +409,90 @@ fun HomeScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }) {
                     Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    showShareDialog?.let { site ->
+        val otherSites = sites.filter { it.id != site.id }
+        AlertDialog(
+            onDismissRequest = { showShareDialog = null },
+            title = { Text("Compartilhar sessão") },
+            text = {
+                Column {
+                    Text(
+                        "Compartilhe cookies e localStorage entre sites. Útil quando URLs diferentes levam ao mesmo serviço.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (site.sharedGroupId > 0) {
+                        TextButton(
+                            onClick = {
+                                scope.launch { app.repository.unshareSession(site.id) }
+                                showShareDialog = null
+                            }
+                        ) {
+                            Icon(Icons.Default.LinkOff, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(4.dp))
+                            Text("Desvincular sessão")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    if (otherSites.isEmpty()) {
+                        Text(
+                            "Adicione mais sites para compartilhar.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        otherSites.forEach { other ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .combinedClickable(onClick = {
+                                        scope.launch { app.repository.shareSession(site.id, other.id) }
+                                        showShareDialog = null
+                                    })
+                                    .padding(vertical = 8.dp, horizontal = 4.dp)
+                            ) {
+                                AsyncImage(
+                                    model = other.faviconUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp))
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(other.title, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        other.url,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (other.sharedGroupId > 0 && other.sharedGroupId == site.sharedGroupId) {
+                                    Icon(
+                                        Icons.Default.Link,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showShareDialog = null }) {
+                    Text("Fechar")
                 }
             }
         )

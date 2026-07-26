@@ -9,5 +9,6 @@ data class SiteEntity(
     val url: String,
     val title: String,
     val faviconUrl: String,
+    val sharedGroupId: Long = 0,
     val addedAt: Long = System.currentTimeMillis()
 )

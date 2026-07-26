@@ -16,4 +16,22 @@ class SiteRepository(private val dao: SiteDao) {
     suspend fun deleteById(id: Long) = dao.deleteById(id)
 
     suspend fun exists(url: String): Boolean = dao.exists(url)
+
+    suspend fun getById(id: Long): SiteEntity? = dao.getById(id)
+
+    suspend fun shareSession(siteId: Long, targetSiteId: Long) {
+        val target = dao.getById(targetSiteId) ?: return
+        val groupId = if (target.sharedGroupId > 0) target.sharedGroupId else targetSiteId
+        dao.updateSharedGroup(siteId, groupId)
+        if (target.sharedGroupId == 0L) {
+            dao.updateSharedGroup(targetSiteId, groupId)
+        }
+    }
+
+    suspend fun unshareSession(siteId: Long) {
+        dao.updateSharedGroup(siteId, 0)
+    }
+
+    suspend fun getGroupPeers(groupId: Long, excludeId: Long): List<SiteEntity> =
+        dao.getGroupPeers(groupId, excludeId)
 }
