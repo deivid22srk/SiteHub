@@ -15,6 +15,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.webkit.WebViewCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -127,7 +128,7 @@ fun WebViewScreen(
         }
     }
 
-    fun injectUserscripts(webView: WebView) {
+    fun setupDocumentStartScripts(webView: WebView) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val scripts = app.userscriptRepository.getEnabledBySiteId(siteId)
@@ -143,7 +144,7 @@ fun WebViewScreen(
                         })();
                     """.trimIndent()
                     CoroutineScope(Dispatchers.Main).launch {
-                        webView.evaluateJavascript(wrappedJs, null)
+                        WebViewCompat.addDocumentStartJavaScript(webView, wrappedJs, setOf("*"))
                     }
                 }
             } catch (_: Exception) {}
@@ -243,6 +244,8 @@ fun WebViewScreen(
                 userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
             }
 
+            setupDocumentStartScripts(this)
+
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
 
@@ -251,7 +254,6 @@ fun WebViewScreen(
                     canGoBack = view?.canGoBack() ?: false
                     view?.let {
                         injectSharedSession(it)
-                        injectUserscripts(it)
                     }
                 }
             }
