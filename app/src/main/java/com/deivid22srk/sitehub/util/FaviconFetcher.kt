@@ -21,6 +21,32 @@ object FaviconFetcher {
         }
     }
 
+    fun extractTitleFromUrl(url: String): String? {
+        val xboxProduct = Regex("""play\.xbox\.com/products/[^/]+/(.+)""", RegexOption.IGNORE_CASE)
+        xboxProduct.find(url)?.let { match ->
+            val slug = match.groupValues[1].split("?").first()
+            return slug.replace("-", " ")
+                .split(" ")
+                .joinToString(" ") { word ->
+                    if (word.length <= 2 && word.lowercase() !in listOf("of", "the", "a", "an")) {
+                        word.uppercase()
+                    } else {
+                        word.replaceFirstChar { it.uppercase() }
+                    }
+                }
+        }
+
+        val steamApp = Regex("""store\.steampowered\.com/app/\d+/(.+)""", RegexOption.IGNORE_CASE)
+        steamApp.find(url)?.let { match ->
+            val slug = match.groupValues[1].split("/").first().split("?").first()
+            return slug.replace("_", " ").replace("-", " ")
+                .split(" ")
+                .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        }
+
+        return null
+    }
+
     suspend fun fetchBestFavicon(url: String): String = withContext(Dispatchers.IO) {
         val domain = extractDomain(url)
         val baseUrl = url.substringBefore("/", url).let {
@@ -80,6 +106,9 @@ object FaviconFetcher {
     }
 
     suspend fun fetchTitle(url: String): String = withContext(Dispatchers.IO) {
+        val fromUrl = extractTitleFromUrl(url)
+        if (fromUrl != null) return@withContext fromUrl
+
         try {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.connectTimeout = 5000
@@ -91,8 +120,20 @@ object FaviconFetcher {
             val html = connection.inputStream.bufferedReader().use { it.readText() }
             connection.disconnect()
 
+            val ogTitle = Regex("""<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.get(1)?.trim()
+            if (ogTitle != null) return@withContext ogTitle
+
             val titleRegex = Regex("<title[^>]*>([^<]+)</title>", RegexOption.IGNORE_CASE)
-            titleRegex.find(html)?.groupValues?.get(1)?.trim() ?: extractDomain(url)
+            val rawTitle = titleRegex.find(html)?.groupValues?.get(1)?.trim()
+            if (rawTitle != null) {
+                val cleaned = rawTitle
+                    .replace(Regex("""\s*[|\-–—]\s*(Xbox|Play|Steam|Official|Site).*$""", RegexOption.IGNORE_CASE), "")
+                    .trim()
+                return@withContext if (cleaned.isNotBlank()) cleaned else rawTitle
+            }
+
+            extractDomain(url)
         } catch (e: Exception) {
             extractDomain(url)
         }

@@ -1,6 +1,9 @@
 package com.deivid22srk.sitehub.ui.screens
 
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -73,6 +76,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.deivid22srk.sitehub.SiteHubApp
 import com.deivid22srk.sitehub.data.model.SiteEntity
+import com.deivid22srk.sitehub.ui.components.ImageCropper
 import com.deivid22srk.sitehub.util.FaviconFetcher
 import kotlinx.coroutines.launch
 
@@ -81,7 +85,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToWebView: (Long, String, String) -> Unit,
-    onNavigateToUserscripts: (Long, String) -> Unit
+    onNavigateToUserscripts: (Long, String, String) -> Unit
 ) {
     val app = LocalContext.current.applicationContext as SiteHubApp
     val sites by app.repository.getAllSites().collectAsState(initial = emptyList())
@@ -230,7 +234,7 @@ fun HomeScreen(
                     text = "Userscripts",
                     onClick = {
                         selectedSite = null
-                        onNavigateToUserscripts(site.id, site.title)
+                        onNavigateToUserscripts(site.id, site.url, site.title)
                     }
                 )
 
@@ -341,49 +345,65 @@ fun HomeScreen(
 
     showIconDialog?.let { site ->
         var iconUrl by remember { mutableStateOf("") }
+        var cropSource by remember { mutableStateOf<Any?>(null) }
+
+        val iconFilePicker = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            uri?.let { cropSource = it }
+        }
+
         AlertDialog(
-            onDismissRequest = { showIconDialog = null },
+            onDismissRequest = { showIconDialog = null; cropSource = null },
             title = { Text("Ícone personalizado") },
             text = {
-                Column {
-                    OutlinedTextField(
-                        value = iconUrl,
-                        onValueChange = { iconUrl = it },
-                        label = { Text("URL da imagem") },
-                        placeholder = { Text("https://exemplo.com/icon.png") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                if (cropSource != null) {
+                    ImageCropper(
+                        imageSource = cropSource!!,
+                        onCropComplete = { path ->
+                            scope.launch { app.repository.updateSite(site.copy(faviconUrl = path)) }
+                            showIconDialog = null
+                            cropSource = null
+                        },
+                        onCancel = { cropSource = null }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    if (iconUrl.isNotBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = iconUrl,
-                                contentDescription = "Preview",
-                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
-                                contentScale = ContentScale.Fit
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("Pré-visualização", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Column {
+                        OutlinedTextField(
+                            value = iconUrl,
+                            onValueChange = { iconUrl = it },
+                            label = { Text("URL da imagem") },
+                            placeholder = { Text("https://exemplo.com/icon.png") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row {
+                            TextButton(
+                                onClick = { iconFilePicker.launch("image/*") },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Escolher imagem")
+                            }
+                            TextButton(
+                                onClick = {
+                                    if (iconUrl.isNotBlank()) cropSource = iconUrl.trim()
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = iconUrl.isNotBlank()
+                            ) {
+                                Text("Recortar URL")
+                            }
                         }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (iconUrl.isNotBlank()) {
-                            scope.launch { app.repository.updateSite(site.copy(faviconUrl = iconUrl.trim())) }
-                        }
-                        showIconDialog = null
-                    }
-                ) {
-                    Text("Aplicar")
-                }
-            },
+            confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showIconDialog = null }) {
-                    Text("Cancelar")
+                if (cropSource == null) {
+                    TextButton(onClick = { showIconDialog = null }) {
+                        Text("Fechar")
+                    }
                 }
             }
         )

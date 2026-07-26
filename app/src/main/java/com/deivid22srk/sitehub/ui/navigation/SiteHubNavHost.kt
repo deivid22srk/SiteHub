@@ -15,14 +15,14 @@ object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val WEBVIEW = "webview/{siteId}/{url}/{title}"
-    const val USERSCRIPTS = "userscripts/{siteId}/{siteTitle}"
+    const val USERSCRIPTS = "userscripts/{siteId}/{siteUrl}/{siteTitle}"
 
     fun webView(siteId: Long, url: String, title: String): String {
         return "webview/$siteId/${java.net.URLEncoder.encode(url, "UTF-8")}/${java.net.URLEncoder.encode(title, "UTF-8")}"
     }
 
-    fun userscripts(siteId: Long, siteTitle: String): String {
-        return "userscripts/$siteId/${java.net.URLEncoder.encode(siteTitle, "UTF-8")}"
+    fun userscripts(siteId: Long, siteUrl: String, siteTitle: String): String {
+        return "userscripts/$siteId/${java.net.URLEncoder.encode(siteUrl, "UTF-8")}/${java.net.URLEncoder.encode(siteTitle, "UTF-8")}"
     }
 }
 
@@ -37,8 +37,8 @@ fun SiteHubNavHost() {
                 onNavigateToWebView = { siteId, url, title ->
                     navController.navigate(Routes.webView(siteId, url, title))
                 },
-                onNavigateToUserscripts = { siteId, siteTitle ->
-                    navController.navigate(Routes.userscripts(siteId, siteTitle))
+                onNavigateToUserscripts = { siteId, siteUrl, siteTitle ->
+                    navController.navigate(Routes.userscripts(siteId, siteUrl, siteTitle))
                 }
             )
         }
@@ -65,12 +65,14 @@ fun SiteHubNavHost() {
             route = Routes.USERSCRIPTS,
             arguments = listOf(
                 navArgument("siteId") { type = NavType.LongType },
+                navArgument("siteUrl") { type = NavType.StringType },
                 navArgument("siteTitle") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val siteId = backStackEntry.arguments?.getLong("siteId") ?: 0L
+            val siteUrl = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("siteUrl") ?: "", "UTF-8")
             val siteTitle = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("siteTitle") ?: "", "UTF-8")
-            UserscriptScreen(siteId = siteId, siteTitle = siteTitle, onBack = { navController.popBackStack() })
+            UserscriptScreen(siteId = siteId, siteUrl = siteUrl, siteTitle = siteTitle, onBack = { navController.popBackStack() })
         }
     }
 }
