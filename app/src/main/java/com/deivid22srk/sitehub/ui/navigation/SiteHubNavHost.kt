@@ -14,11 +14,11 @@ import com.deivid22srk.sitehub.ui.screens.WebViewScreen
 object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
-    const val WEBVIEW = "webview/{url}/{title}"
+    const val WEBVIEW = "webview/{siteId}/{url}/{title}"
     const val USERSCRIPTS = "userscripts/{siteId}/{siteTitle}"
 
-    fun webView(url: String, title: String): String {
-        return "webview/${java.net.URLEncoder.encode(url, "UTF-8")}/${java.net.URLEncoder.encode(title, "UTF-8")}"
+    fun webView(siteId: Long, url: String, title: String): String {
+        return "webview/$siteId/${java.net.URLEncoder.encode(url, "UTF-8")}/${java.net.URLEncoder.encode(title, "UTF-8")}"
     }
 
     fun userscripts(siteId: Long, siteTitle: String): String {
@@ -34,8 +34,8 @@ fun SiteHubNavHost() {
         composable(Routes.HOME) {
             HomeScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
-                onNavigateToWebView = { url, title ->
-                    navController.navigate(Routes.webView(url, title))
+                onNavigateToWebView = { siteId, url, title ->
+                    navController.navigate(Routes.webView(siteId, url, title))
                 },
                 onNavigateToUserscripts = { siteId, siteTitle ->
                     navController.navigate(Routes.userscripts(siteId, siteTitle))
@@ -50,13 +50,15 @@ fun SiteHubNavHost() {
         composable(
             route = Routes.WEBVIEW,
             arguments = listOf(
+                navArgument("siteId") { type = NavType.LongType },
                 navArgument("url") { type = NavType.StringType },
                 navArgument("title") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val siteId = backStackEntry.arguments?.getLong("siteId") ?: 0L
             val url = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("url") ?: "", "UTF-8")
             val title = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("title") ?: "", "UTF-8")
-            WebViewScreen(url = url, title = title, onBack = { navController.popBackStack() })
+            WebViewScreen(siteId = siteId, url = url, title = title, onBack = { navController.popBackStack() })
         }
 
         composable(

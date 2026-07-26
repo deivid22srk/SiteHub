@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 class UserscriptRepository(private val dao: UserscriptDao) {
     fun getBySiteId(siteId: Long): Flow<List<UserscriptEntity>> = dao.getBySiteId(siteId)
 
+    suspend fun getEnabledBySiteId(siteId: Long): List<UserscriptEntity> = dao.getEnabledBySiteId(siteId)
+
     suspend fun insert(script: UserscriptEntity) = dao.insert(script)
 
     suspend fun update(script: UserscriptEntity) = dao.update(script)

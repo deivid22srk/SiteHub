@@ -14,6 +14,9 @@ interface UserscriptDao {
     @Query("SELECT * FROM userscripts WHERE siteId = :siteId ORDER BY importedAt DESC")
     fun getBySiteId(siteId: Long): Flow<List<UserscriptEntity>>
 
+    @Query("SELECT * FROM userscripts WHERE siteId = :siteId AND enabled = 1")
+    suspend fun getEnabledBySiteId(siteId: Long): List<UserscriptEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(script: UserscriptEntity)
 

@@ -78,7 +78,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
-    onNavigateToWebView: (String, String) -> Unit,
+    onNavigateToWebView: (Long, String, String) -> Unit,
     onNavigateToUserscripts: (Long, String) -> Unit
 ) {
     val app = LocalContext.current.applicationContext as SiteHubApp
@@ -153,7 +153,7 @@ fun HomeScreen(
                 items(sites, key = { it.id }) { site ->
                     SiteGridItem(
                         site = site,
-                        onClick = { onNavigateToWebView(site.url, site.title) },
+                        onClick = { onNavigateToWebView(site.id, site.url, site.title) },
                         onLongClick = { selectedSite = site }
                     )
                 }
@@ -200,7 +200,7 @@ fun HomeScreen(
                     text = "Abrir site",
                     onClick = {
                         selectedSite = null
-                        onNavigateToWebView(site.url, site.title)
+                        onNavigateToWebView(site.id, site.url, site.title)
                     }
                 )
 

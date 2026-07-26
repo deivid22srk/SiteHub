@@ -44,24 +44,31 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.deivid22srk.sitehub.SiteHubApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun WebViewScreen(
+    siteId: Long,
     url: String,
     title: String,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+    val app = context.applicationContext as SiteHubApp
     val prefs = context.getSharedPreferences("sitehub_prefs", Context.MODE_PRIVATE)
     val fullscreenMode = prefs.getBoolean("fullscreen_mode", false)
 
     var canGoBack by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    var customView by remember { mutableStateOf<View?>(null) }
+    var containerRef by remember { mutableStateOf<FrameLayout?>(null) }
+    var isCustomViewActive by remember { mutableStateOf(false) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
     DisposableEffect(fullscreenMode) {
@@ -86,18 +93,61 @@ fun WebViewScreen(
         }
     }
 
-    BackHandler(enabled = customView != null) {
+    BackHandler(enabled = isCustomViewActive) {
         customViewCallback?.onCustomViewHidden()
-        customView = null
-        customViewCallback = null
     }
 
-    BackHandler(enabled = canGoBack && customView == null) {
+    BackHandler(enabled = canGoBack && !isCustomViewActive) {
         webViewRef?.goBack()
     }
 
-    BackHandler(enabled = !canGoBack && customView == null) {
+    BackHandler(enabled = !canGoBack && !isCustomViewActive) {
         onBack()
+    }
+
+    fun hideSystemBars() {
+        activity?.let { act ->
+            val window = act.window
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val ctrl = WindowInsetsControllerCompat(window, window.decorView)
+            ctrl.hide(WindowInsetsCompat.Type.systemBars())
+            ctrl.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    fun showSystemBars() {
+        if (!fullscreenMode) {
+            activity?.let { act ->
+                val window = act.window
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                val ctrl = WindowInsetsControllerCompat(window, window.decorView)
+                ctrl.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
+    fun injectUserscripts(webView: WebView) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val scripts = app.userscriptRepository.getEnabledBySiteId(siteId)
+                if (scripts.isNotEmpty()) {
+                    val combinedJs = scripts.joinToString("\n") { it.scriptContent }
+                    val wrappedJs = """
+                        (function() {
+                            try {
+                                $combinedJs
+                            } catch(e) {
+                                console.error('[SiteHub Userscript Error]', e);
+                            }
+                        })();
+                    """.trimIndent()
+                    CoroutineScope(Dispatchers.Main).launch {
+                        webView.evaluateJavascript(wrappedJs, null)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun createWebView(ctx: Context): WebView {
@@ -105,6 +155,9 @@ fun WebViewScreen(
             webViewRef = this
 
             setBackgroundColor(0xFF000000.toInt())
+            isFocusable = true
+            isFocusableInTouchMode = true
+            requestFocus()
 
             settings.apply {
                 javaScriptEnabled = true
@@ -131,6 +184,12 @@ fun WebViewScreen(
 
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    canGoBack = view?.canGoBack() ?: false
+                    view?.let { injectUserscripts(it) }
+                }
             }
 
             webChromeClient = object : WebChromeClient() {
@@ -139,32 +198,41 @@ fun WebViewScreen(
                 }
 
                 override fun onPermissionRequest(request: PermissionRequest?) {
-                    request?.let {
-                        it.grant(it.resources)
-                    }
+                    request?.let { it.grant(it.resources) }
                 }
 
                 override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                    customView = view
+                    if (view == null) return
                     customViewCallback = callback
-                    if (activity != null) {
-                        val window = activity.window
-                        WindowCompat.setDecorFitsSystemWindows(window, false)
-                        val ctrl = WindowInsetsControllerCompat(window, window.decorView)
-                        ctrl.hide(WindowInsetsCompat.Type.systemBars())
-                        ctrl.systemBarsBehavior =
-                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    isCustomViewActive = true
+
+                    containerRef?.let { container ->
+                        webViewRef?.visibility = View.GONE
+                        view.layoutParams = FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        container.addView(view)
                     }
+
+                    hideSystemBars()
+                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 }
 
                 override fun onHideCustomView() {
-                    customView = null
+                    containerRef?.let { container ->
+                        val childCount = container.childCount
+                        for (i in childCount - 1 downTo 1) {
+                            container.removeViewAt(i)
+                        }
+                    }
+                    webViewRef?.visibility = View.VISIBLE
+                    isCustomViewActive = false
                     customViewCallback = null
-                    if (activity != null && !fullscreenMode) {
-                        val window = activity.window
-                        WindowCompat.setDecorFitsSystemWindows(window, true)
-                        val ctrl = WindowInsetsControllerCompat(window, window.decorView)
-                        ctrl.show(WindowInsetsCompat.Type.systemBars())
+
+                    showSystemBars()
+                    if (!fullscreenMode) {
+                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
 
@@ -194,6 +262,7 @@ fun WebViewScreen(
         AndroidView(
             factory = { ctx ->
                 FrameLayout(ctx).apply {
+                    containerRef = this
                     addView(createWebView(ctx), FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -242,6 +311,7 @@ fun WebViewScreen(
             AndroidView(
                 factory = { ctx ->
                     FrameLayout(ctx).apply {
+                        containerRef = this
                         addView(createWebView(ctx), FrameLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
