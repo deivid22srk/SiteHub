@@ -185,7 +185,7 @@ fun HomeScreen(
                             .build(),
                         contentDescription = null,
                         modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Fit
+                        contentScale = ContentScale.Crop
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -565,17 +565,15 @@ fun SiteGridItem(
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(site.faviconUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = site.title,
-                    modifier = Modifier.size(40.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(site.faviconUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = site.title,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                contentScale = ContentScale.Crop
+            )
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
