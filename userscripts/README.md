@@ -97,12 +97,17 @@ zip -r ../meu-script.shub manifest.json script.js
 
 Na pasta `exemplos/better-xcloud/` você encontra o arquivo `better-xcloud.shub` pronto para importar.
 
-Este script é baseado no projeto [better-xcloud](https://github.com/redphx/better-xcloud) e adiciona melhorias à interface do Xbox Cloud Gaming:
+Este é o script **completo e oficial** do projeto [better-xcloud](https://github.com/redphx/better-xcloud) (v6.7.12), que adiciona melhorias à interface do Xbox Cloud Gaming:
 
-- Remove elementos desnecessários da interface
-- Adiciona atalhos rápidos
-- Melhora a responsividade dos controles touch
-- Otimiza o layout para telas menores
+- Menu de configurações completo dentro do stream
+- Estatísticas de rede em tempo real (latência, bitrate, FPS)
+- Atalhos de teclado e controle personalizáveis
+- Suporte a mouse e teclado (MKB)
+- Captura de screenshots
+- Controles touch aprimorados
+- Pular splash screen
+- Tema escuro OLED
+- E muito mais
 
 ### Como usar:
 
@@ -112,6 +117,8 @@ Este script é baseado no projeto [better-xcloud](https://github.com/redphx/bett
 4. Toque em **Userscripts** > **+**
 5. Selecione o arquivo `better-xcloud.shub`
 6. Ative o script e abra o site
+
+> O script completo tem ~474KB e não requer nenhuma API externa (sem GM_*). Funciona 100% com injeção direta no WebView.
 
 ## Dicas
 
