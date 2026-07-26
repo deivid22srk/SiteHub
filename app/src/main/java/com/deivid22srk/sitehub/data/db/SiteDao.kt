@@ -1,0 +1,27 @@
+package com.deivid22srk.sitehub.data.db
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.deivid22srk.sitehub.data.model.SiteEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface SiteDao {
+    @Query("SELECT * FROM sites ORDER BY addedAt DESC")
+    fun getAllSites(): Flow<List<SiteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(site: SiteEntity)
+
+    @Delete
+    suspend fun delete(site: SiteEntity)
+
+    @Query("DELETE FROM sites WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM sites WHERE url = :url)")
+    suspend fun exists(url: String): Boolean
+}
