@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
@@ -77,7 +78,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
-    onNavigateToWebView: (String, String) -> Unit
+    onNavigateToWebView: (String, String) -> Unit,
+    onNavigateToUserscripts: (Long, String) -> Unit
 ) {
     val app = LocalContext.current.applicationContext as SiteHubApp
     val sites by app.repository.getAllSites().collectAsState(initial = emptyList())
@@ -217,6 +219,15 @@ fun HomeScreen(
                     onClick = {
                         selectedSite = null
                         showIconDialog = site
+                    }
+                )
+
+                SheetItem(
+                    icon = { Icon(Icons.Default.Code, contentDescription = null) },
+                    text = "Userscripts",
+                    onClick = {
+                        selectedSite = null
+                        onNavigateToUserscripts(site.id, site.title)
                     }
                 )
 
@@ -392,6 +403,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SheetItem(
     icon: @Composable () -> Unit,

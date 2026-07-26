@@ -5,10 +5,12 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.deivid22srk.sitehub.data.model.SiteEntity
+import com.deivid22srk.sitehub.data.model.UserscriptEntity
 
-@Database(entities = [SiteEntity::class], version = 1, exportSchema = false)
+@Database(entities = [SiteEntity::class, UserscriptEntity::class], version = 2, exportSchema = false)
 abstract class SiteDatabase : RoomDatabase() {
     abstract fun siteDao(): SiteDao
+    abstract fun userscriptDao(): UserscriptDao
 
     companion object {
         @Volatile
@@ -20,7 +22,7 @@ abstract class SiteDatabase : RoomDatabase() {
                     context.applicationContext,
                     SiteDatabase::class.java,
                     "sitehub.db"
-                ).build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
         }
     }
