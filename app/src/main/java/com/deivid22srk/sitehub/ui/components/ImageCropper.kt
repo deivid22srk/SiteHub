@@ -15,34 +15,35 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -56,15 +57,19 @@ fun ImageCropper(
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var isLoading by remember { mutableStateOf(true) }
+    var hasError by remember { mutableStateOf(false) }
 
-    remember(imageSource) {
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val bmp = when (imageSource) {
+    LaunchedEffect(imageSource) {
+        isLoading = true
+        hasError = false
+        try {
+            val bmp = withContext(Dispatchers.IO) {
+                when (imageSource) {
                     is Uri -> {
                         context.contentResolver.openInputStream(imageSource)?.use {
                             BitmapFactory.decodeStream(it)
@@ -79,15 +84,13 @@ fun ImageCropper(
                     }
                     else -> null
                 }
-                withContext(Dispatchers.Main) {
-                    bitmap = bmp
-                    isLoading = false
-                }
-            } catch (_: Exception) {
-                withContext(Dispatchers.Main) { isLoading = false }
             }
+            bitmap = bmp
+            if (bmp == null) hasError = true
+        } catch (_: Exception) {
+            hasError = true
         }
-        true
+        isLoading = false
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -98,7 +101,18 @@ fun ImageCropper(
             ) {
                 Text("Carregando imagem...", style = MaterialTheme.typography.bodySmall)
             }
-        } else if (bitmap != null) {
+        } else if (hasError || bitmap == null) {
+            Box(
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Erro ao carregar imagem", style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                Text("Voltar")
+            }
+        } else {
             val bmp = bitmap!!
             val imageBitmap = remember(bmp) { bmp.asImageBitmap() }
 
@@ -119,10 +133,9 @@ fun ImageCropper(
                     }
             ) {
                 Canvas(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
-                    val canvasSize = size.minDimension
                     val bmpW = bmp.width.toFloat()
                     val bmpH = bmp.height.toFloat()
-                    val baseScale = canvasSize / maxOf(bmpW, bmpH)
+                    val baseScale = size.minDimension / maxOf(bmpW, bmpH)
                     val drawScale = baseScale * scale
                     val drawW = bmpW * drawScale
                     val drawH = bmpH * drawScale
@@ -132,8 +145,8 @@ fun ImageCropper(
                     clipRect(0f, 0f, size.width, size.height) {
                         drawImage(
                             image = imageBitmap,
-                            dstOffset = androidx.compose.ui.geometry.Offset(cx, cy),
-                            dstSize = Size(drawW, drawH)
+                            dstOffset = IntOffset(cx.toInt(), cy.toInt()),
+                            dstSize = IntSize(drawW.toInt(), drawH.toInt())
                         )
                     }
 
@@ -166,7 +179,7 @@ fun ImageCropper(
                 }
                 TextButton(
                     onClick = {
-                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        scope.launch(Dispatchers.IO) {
                             try {
                                 val cropped = cropCenterSquare(bmp, scale, offset)
                                 val file = saveBitmap(context, cropped, "icon_${System.currentTimeMillis()}.png")
@@ -181,25 +194,13 @@ fun ImageCropper(
                     Text("Recortar e aplicar")
                 }
             }
-        } else {
-            Box(
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Erro ao carregar imagem", style = MaterialTheme.typography.bodySmall)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
-                Text("Voltar")
-            }
         }
     }
 }
 
 private fun cropCenterSquare(source: Bitmap, scale: Float, offset: Offset): Bitmap {
-    val size = minOf(source.width, source.height)
-    val scaledW = (source.width * scale).toInt()
-    val scaledH = (source.height * scale).toInt()
+    val scaledW = (source.width * scale).toInt().coerceAtLeast(1)
+    val scaledH = (source.height * scale).toInt().coerceAtLeast(1)
     val scaled = Bitmap.createScaledBitmap(source, scaledW, scaledH, true)
 
     val cropSize = minOf(scaledW, scaledH)
