@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.deivid22srk.sitehub.data.model.SiteEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -15,6 +16,9 @@ interface SiteDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(site: SiteEntity)
+
+    @Update
+    suspend fun update(site: SiteEntity)
 
     @Delete
     suspend fun delete(site: SiteEntity)

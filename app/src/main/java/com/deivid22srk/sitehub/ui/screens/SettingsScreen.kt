@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -48,6 +47,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
     var dynamicColor by remember { mutableStateOf(prefs.getBoolean("dynamic_color", true)) }
     var darkTheme by remember { mutableStateOf(prefs.getBoolean("dark_theme", false)) }
+    var fullscreen by remember { mutableStateOf(prefs.getBoolean("fullscreen_mode", false)) }
     var gridColumns by remember { mutableIntStateOf(prefs.getInt("grid_columns", 4)) }
 
     Scaffold(
@@ -118,6 +118,38 @@ fun SettingsScreen(onBack: () -> Unit) {
                             }
                         )
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                "Navegação",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(16.dp).fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Tela cheia", style = MaterialTheme.typography.bodyLarge)
+                        Text("Abrir sites sem barra superior", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = fullscreen,
+                        onCheckedChange = {
+                            fullscreen = it
+                            prefs.edit().putBoolean("fullscreen_mode", it).apply()
+                        }
+                    )
                 }
             }
 

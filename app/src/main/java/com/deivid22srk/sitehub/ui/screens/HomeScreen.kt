@@ -1,5 +1,6 @@
 package com.deivid22srk.sitehub.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -27,6 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -37,11 +43,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -75,11 +83,16 @@ fun HomeScreen(
     val sites by app.repository.getAllSites().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf<SiteEntity?>(null) }
+    var selectedSite by remember { mutableStateOf<SiteEntity?>(null) }
     var urlInput by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
 
+    var showEditTitleDialog by remember { mutableStateOf<SiteEntity?>(null) }
+    var showIconDialog by remember { mutableStateOf<SiteEntity?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<SiteEntity?>(null) }
+
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val sheetState = rememberModalBottomSheetState()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -139,9 +152,83 @@ fun HomeScreen(
                     SiteGridItem(
                         site = site,
                         onClick = { onNavigateToWebView(site.url, site.title) },
-                        onLongClick = { showDeleteDialog = site }
+                        onLongClick = { selectedSite = site }
                     )
                 }
+            }
+        }
+    }
+
+    selectedSite?.let { site ->
+        ModalBottomSheet(
+            onDismissRequest = { selectedSite = null },
+            sheetState = sheetState
+        ) {
+            Column(modifier = Modifier.padding(bottom = 32.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(site.faviconUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(site.title, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            site.url,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SheetItem(
+                    icon = { Icon(Icons.Default.OpenInBrowser, contentDescription = null) },
+                    text = "Abrir site",
+                    onClick = {
+                        selectedSite = null
+                        onNavigateToWebView(site.url, site.title)
+                    }
+                )
+
+                SheetItem(
+                    icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    text = "Editar título",
+                    onClick = {
+                        selectedSite = null
+                        showEditTitleDialog = site
+                    }
+                )
+
+                SheetItem(
+                    icon = { Icon(Icons.Default.Image, contentDescription = null) },
+                    text = "Ícone personalizado",
+                    onClick = {
+                        selectedSite = null
+                        showIconDialog = site
+                    }
+                )
+
+                SheetItem(
+                    icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                    text = "Remover",
+                    textColor = MaterialTheme.colorScheme.error,
+                    onClick = {
+                        selectedSite = null
+                        showDeleteDialog = site
+                    }
+                )
             }
         }
     }
@@ -172,7 +259,7 @@ fun HomeScreen(
                                 isLoading = true
                                 val normalizedUrl = if (!urlInput.startsWith("http")) "https://$urlInput" else urlInput
                                 val title = FaviconFetcher.fetchTitle(normalizedUrl)
-                                val favicon = FaviconFetcher.getFaviconUrl(normalizedUrl)
+                                val favicon = FaviconFetcher.fetchBestFavicon(normalizedUrl)
                                 app.repository.addSite(
                                     SiteEntity(url = normalizedUrl, title = title, faviconUrl = favicon)
                                 )
@@ -189,6 +276,90 @@ fun HomeScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false; urlInput = "" }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    showEditTitleDialog?.let { site ->
+        var newTitle by remember { mutableStateOf(site.title) }
+        AlertDialog(
+            onDismissRequest = { showEditTitleDialog = null },
+            title = { Text("Editar título") },
+            text = {
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    label = { Text("Título") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newTitle.isNotBlank()) {
+                            scope.launch { app.repository.updateSite(site.copy(title = newTitle.trim())) }
+                        }
+                        showEditTitleDialog = null
+                    }
+                ) {
+                    Text("Salvar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditTitleDialog = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    showIconDialog?.let { site ->
+        var iconUrl by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showIconDialog = null },
+            title = { Text("Ícone personalizado") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = iconUrl,
+                        onValueChange = { iconUrl = it },
+                        label = { Text("URL da imagem") },
+                        placeholder = { Text("https://exemplo.com/icon.png") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (iconUrl.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = iconUrl,
+                                contentDescription = "Preview",
+                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Pré-visualização", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (iconUrl.isNotBlank()) {
+                            scope.launch { app.repository.updateSite(site.copy(faviconUrl = iconUrl.trim())) }
+                        }
+                        showIconDialog = null
+                    }
+                ) {
+                    Text("Aplicar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showIconDialog = null }) {
                     Text("Cancelar")
                 }
             }
@@ -218,6 +389,27 @@ fun HomeScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun SheetItem(
+    icon: @Composable () -> Unit,
+    text: String,
+    textColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp)
+    ) {
+        icon()
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = textColor)
     }
 }
 

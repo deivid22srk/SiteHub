@@ -1,12 +1,14 @@
 package com.deivid22srk.sitehub.ui.screens
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -38,6 +41,10 @@ fun WebViewScreen(
     title: String,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("sitehub_prefs", Context.MODE_PRIVATE)
+    val fullscreenMode = prefs.getBoolean("fullscreen_mode", false)
+
     var canGoBack by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -50,45 +57,10 @@ fun WebViewScreen(
         onBack()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        title,
-                        maxLines = 1,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (canGoBack) webViewRef?.goBack() else onBack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { padding ->
-        if (progress < 1f) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.padding(padding).fillMaxSize().padding(top = 0.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
+    if (fullscreenMode) {
         AndroidView(
-            factory = { context ->
-                WebView(context).apply {
+            factory = { ctx ->
+                WebView(ctx).apply {
                     webViewRef = this
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
@@ -99,9 +71,7 @@ fun WebViewScreen(
                     settings.displayZoomControls = false
 
                     webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                            return false
-                        }
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
                     }
 
                     webChromeClient = object : WebChromeClient() {
@@ -110,19 +80,77 @@ fun WebViewScreen(
                         }
                     }
 
-                    setOnKeyListener { _, keyCode, event ->
-                        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP && canGoBack) {
-                            goBack()
-                            true
-                        } else false
-                    }
-
                     loadUrl(url)
                 }
             },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier = Modifier.fillMaxSize()
         )
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            title,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            if (canGoBack) webViewRef?.goBack() else onBack()
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        ) { padding ->
+            if (progress < 1f) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.padding(padding).fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        webViewRef = this
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
+                        }
+
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                progress = newProgress / 100f
+                            }
+                        }
+
+                        loadUrl(url)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            )
+        }
     }
 }

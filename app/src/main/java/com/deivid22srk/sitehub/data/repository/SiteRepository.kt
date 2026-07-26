@@ -9,6 +9,8 @@ class SiteRepository(private val dao: SiteDao) {
 
     suspend fun addSite(site: SiteEntity) = dao.insert(site)
 
+    suspend fun updateSite(site: SiteEntity) = dao.update(site)
+
     suspend fun deleteSite(site: SiteEntity) = dao.delete(site)
 
     suspend fun deleteById(id: Long) = dao.deleteById(id)
